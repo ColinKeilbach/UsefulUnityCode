@@ -4,34 +4,49 @@ using UnityEngine;
 
 namespace Bezier
 {
-
     public class BezierCurve : MonoBehaviour
     {
         const int maxRecommendedPoints = 10;
         const float lengthPrecision = 0.05f;
 
-        private List<Vector3> points = new List<Vector3>();
-        [SerializeField]
-        private float length;
+        protected List<Vector3> points = new List<Vector3>();
+        protected float length;
 
         public float Length
         {
             get { return length; }
-            private set { length = value; }
+            protected set { length = value; }
         }
 
         private void Awake()
         {
 #if UNITY_EDITOR
-            showGUI = false; // Prevents the GUI from changing anything in play mode
+            showCurve = false; // Prevents the GUI from changing anything in play mode
 #endif
 
             UpdateList();
             UpdateLength(lengthPrecision);
 
+            switch (points.Count)
+            {
+                case 3:
+                    Debug.LogWarning("BezierCurves with 3 control points should be QuadraticBezierCurves.");
+                    break;
+                case 4:
+                    Debug.LogWarning("BezierCurves with 4 control points should be CubicBezierCurves.");
+                    break;
+            }
+
             if (points.Count > maxRecommendedPoints)
-                Debug.LogWarning("BezierCurve is using more than " + maxRecommendedPoints + " points");
+                Debug.LogWarning("BezierCurve is using more than " + maxRecommendedPoints + " control points.");
         }
+
+        private void Start()
+        {
+            OnStart();
+        }
+
+        protected virtual void OnStart() { }
 
         #region Update Functions (Called on Awake)
 
@@ -92,29 +107,49 @@ namespace Bezier
 
         [Header("Editor Only")]
         [SerializeField]
-        private bool showGUI = true;
+        private bool showCurve = true;
+        [SerializeField]
+        private bool showControlPoints = true;
 
         private const float gizmoPrecision = 0.05f;
+        private Vector3 lastGizmoPos;
         private Vector3 gizmoPos;
 
         private void OnDrawGizmos()
         {
-            if (showGUI)
+            if (showCurve)
             {
                 UpdateList();
+                OnStart();
 
-                for (float t = gizmoPrecision; t <= 1; t += gizmoPrecision)
+
+                lastGizmoPos = GetCurvePosition(0);
+
+                for (float t = gizmoPrecision; t <= 1 + gizmoPrecision; t += gizmoPrecision)
                 {
                     gizmoPos = GetCurvePosition(t);
 
-                    Gizmos.color = Color.grey;
-                    Gizmos.DrawSphere(gizmoPos, 0.25f);
+                    Gizmos.color = Color.cyan;
+                    Gizmos.DrawLine(lastGizmoPos, gizmoPos);
+
+                    lastGizmoPos = gizmoPos;
                 }
 
-                foreach (Transform controlPoint in transform)
+                if (showControlPoints)
                 {
-                    Gizmos.color = Color.red;
-                    Gizmos.DrawSphere(controlPoint.position, 0.25f);
+                    Transform lastControlPoint = null;
+
+                    foreach (Transform controlPoint in transform)
+                    {
+                        Gizmos.color = Color.gray;
+                        if (lastControlPoint != null)
+                            Gizmos.DrawLine(lastControlPoint.position, controlPoint.position);
+
+                        lastControlPoint = controlPoint;
+
+                        Gizmos.color = Color.red;
+                        Gizmos.DrawSphere(lastControlPoint.position, 0.05f);
+                    }
                 }
             }
         }
